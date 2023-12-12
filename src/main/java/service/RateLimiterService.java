@@ -1,33 +1,47 @@
 package service;
-
 import constants.RateLimiterConstant;
+import dto.Partner;
 import javafx.util.Pair;
 import java.util.HashMap;
 import java.util.Map;
 
 public class RateLimiterService {
-    Map<Integer, Pair<Integer,Long>> customerHitMap=new HashMap<>();
-    public boolean rateLimit(int customerId){
-        if (!customerHitMap.containsKey(customerId)){
-            Pair pair=new Pair(RateLimiterConstant.BUCKET_SIZE-1,System.currentTimeMillis()+RateLimiterConstant.TIME_WINDOW);
-            customerHitMap.put(customerId,pair);
-            return true;
+    Map<String, Partner> partnerHitMap=new HashMap<>();
+    public void rateLimit(String partnerId){
+
+        if (!partnerHitMap.containsKey(partnerId)){
+            Partner partner=new Partner(partnerId);
+            partner.getPartnerQueue().add("Hello Shubham from "+partner.getPartnerId());
+            partnerHitMap.put(partner.getPartnerId(), partner);
+            pollQueue(partner.getPartnerId());
         }else {
-            if (customerHitMap.get(customerId).getKey()>0){
-                Pair pair=new Pair(customerHitMap.get(customerId).getKey()-1,customerHitMap.get(customerId).getValue());
-                customerHitMap.put(customerId,pair);
-                return true;
+            Partner partner=partnerHitMap.get(partnerId);
+            if(partner.getTokenCount()>0){
+                partner.getPartnerQueue().add("Hello Shubham from " + partner.getPartnerId());
+                partnerHitMap.put(partner.getPartnerId(), partner);
+                pollQueue(partner.getPartnerId());
             }else {
-                long currentTime=System.currentTimeMillis();
-                if (currentTime>customerHitMap.get(customerId).getValue()){
-                    Pair pair=new Pair(RateLimiterConstant.BUCKET_SIZE-1,System.currentTimeMillis()+RateLimiterConstant.TIME_WINDOW);
-                    customerHitMap.put(customerId,pair);
-                    return true;
-                }else {
-                    return false;
+                long currentTime = System.currentTimeMillis();
+                if (currentTime > partner.getRefilTime()) {
+                    partner.setTokenCount(RateLimiterConstant.BUCKET_SIZE);
+                    partner.setRefilTime(currentTime + RateLimiterConstant.TIME_WINDOW);
+                    pollQueue(partner.getPartnerId());
+                } else {//limit exceeded
+                    System.out.println("Limit Exceeded Slowing queue for "+partner.getPartnerId());
                 }
+                partner.getPartnerQueue().add("Hello Shubham from " + partner.getPartnerId());
+                partnerHitMap.put(partner.getPartnerId(), partner);
             }
         }
 
+    }
+
+    public  void pollQueue(String partnerId){
+        Partner partner=partnerHitMap.get(partnerId);
+        while (!partner.getPartnerQueue().isEmpty() && partner.getTokenCount()>0) {
+            partner.setTokenCount(partner.getTokenCount()-1);
+            System.out.println(partner.getPartnerQueue().poll()+" Size= "+partner.getPartnerQueue().size());
+        }
+        partnerHitMap.put(partnerId,partner);
     }
 }
